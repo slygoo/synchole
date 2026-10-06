@@ -1,0 +1,221 @@
+syntax = "proto3";
+
+package syncproto;
+option go_package = "synchole/syncproto;syncproto";
+
+message SendTabToSelfSpecifics {
+  bytes  title                                = 1;
+  bytes  url                                  = 2;
+  int64  shared_time_usec                     = 3;
+  bytes  device_name                          = 4;
+  bytes  guid                                 = 5;
+  bytes  target_device_sync_cache_guid        = 7;
+  bool   notification_dismissed               = 8;
+  bool   opened                               = 9;
+  int64  received_time_windows_epoch_micros   = 13;
+  int64  opened_time_windows_epoch_micros     = 14;
+}
+message SyncSendTabToSelf {
+  SendTabToSelfSpecifics send_tab_to_self = 601980;
+}
+
+message DeviceSyncedTypes {
+  bytes          registration = 1;
+  repeated int32 data_type    = 2;
+}
+message DeviceInfoSpecifics {
+  bytes  cache_guid              = 1;
+  bytes  client_name             = 2;
+  int32  device_type             = 3;
+  bytes  sync_user_agent         = 4;
+  bytes  chrome_version          = 5;
+  bytes  signin_scoped_device_id = 7;
+  int64  last_updated_timestamp  = 8;
+  bytes  model                   = 11;
+  bytes  manufacturer            = 12;
+  DeviceSyncedTypes synced_types = 14;
+  int32  os_type                 = 19;
+  int32  form_factor             = 20;
+}
+message SyncDeviceInfo {
+  DeviceInfoSpecifics device_info = 154522;
+}
+
+message WebAppSpecifics {
+  bytes  start_url         = 1;
+  bytes  name              = 2;
+  int32  user_display_mode = 3;
+  uint32 theme_color       = 4;
+  bytes  scope             = 5;
+  bytes  manifest_id       = 9;
+}
+message SyncWebApp {
+  WebAppSpecifics web_app = 673225;
+}
+
+message WebauthnCredentialSpecifics {
+  bytes  sync_id           = 1;
+  bytes  credential_id     = 2;
+  bytes  rp_id             = 3;
+  bytes  user_id           = 4;
+  int64  creation_time     = 6;
+  bytes  user_name         = 7;
+  bytes  user_display_name = 8;
+  int32  key_version       = 9;
+  bytes  private_key       = 10;
+
+  bytes  encrypted         = 12;
+}
+message SyncWebauthnCredential {
+  WebauthnCredentialSpecifics webauthn_credential = 895275;
+}
+
+message AutofillSpecifics {
+  bytes         name            = 1;
+  bytes         value           = 2;
+  repeated int64 usage_timestamp = 3;
+}
+message SyncAutofill {
+  AutofillSpecifics autofill = 31729;
+}
+
+message AutofillProfileSpecifics {
+  bytes          guid                    = 15;
+  bytes          origin                  = 16;
+  repeated bytes name_first              = 2;
+  repeated bytes name_middle             = 3;
+  repeated bytes name_last               = 4;
+  repeated bytes name_full               = 21;
+  repeated bytes email_address           = 5;
+  bytes          company_name            = 6;
+  bytes          address_home_line1      = 7;
+  bytes          address_home_line2      = 8;
+  bytes          address_home_city       = 9;
+  bytes          address_home_state      = 10;
+  bytes          address_home_zip        = 11;
+  bytes          address_home_country    = 12;
+  repeated bytes phone_home_whole_number = 13;
+  bytes          address_home_street_address = 27;
+}
+message SyncAutofillProfile {
+  AutofillProfileSpecifics autofill_profile = 63951;
+}
+
+message SavedTabGroupData {
+  bytes  title    = 1;
+  int32  color    = 2;
+  int32  position = 3;
+}
+message SavedTabGroupTab {
+  bytes  group_guid = 1;
+  bytes  url        = 2;
+  bytes  title      = 3;
+  int32  position   = 4;
+}
+message SavedTabGroupSpecifics {
+  bytes  guid                               = 1;
+  int64  creation_time_windows_epoch_micros = 2;
+  int64  update_time_windows_epoch_micros   = 3;
+  SavedTabGroupData group                   = 4;
+  SavedTabGroupTab  tab                     = 5;
+}
+message SyncSavedTabGroup {
+  SavedTabGroupSpecifics saved_tab_group = 1004874;
+}
+
+message SessionTabNavigation {
+  bytes  virtual_url    = 2;
+  bytes  referrer       = 3;
+  bytes  title          = 4;
+  int32  unique_id      = 8;
+  int64  timestamp_msec = 9;
+  bytes  favicon_url    = 17;
+  int32  http_status_code = 20;
+}
+message SessionTabData {
+  int32  window_id                = 1;
+  int32  tab_id                   = 2;
+  int32  tab_visual_index         = 3;
+  int32  current_navigation_index = 4;
+  bool   pinned                   = 5;
+  bytes  extension_app_id         = 6;
+  repeated SessionTabNavigation navigation = 7;
+}
+message SessionWindowData {
+  int32  window_id          = 1;
+  int32  selected_tab_index = 2;
+  repeated int32 tab        = 4;
+}
+message SessionHeaderData {
+  repeated SessionWindowData window = 2;
+  bytes  client_name               = 3;
+}
+message SessionSpecificsMsg {
+  bytes  session_tag  = 1;
+  SessionHeaderData header = 2;
+  SessionTabData    tab    = 3;
+  int32  tab_node_id  = 4;
+}
+message SyncSession {
+  SessionSpecificsMsg session = 50119;
+}
+
+message UserConsentSpecifics {
+  bytes  account_id               = 6;
+  int64  client_consent_time_usec = 12;
+}
+message SyncUserConsent {
+  UserConsentSpecifics user_consent = 556014;
+}
+
+message GlobalIdDirective {
+  repeated int64 global_id       = 1;
+  int64          start_time_usec = 2;
+  int64          end_time_usec   = 3;
+}
+message TimeRangeDirective {
+  int64  start_time_usec = 1;
+  int64  end_time_usec   = 2;
+}
+message UrlDirective {
+  bytes  url             = 1;
+  int64  end_time_usec   = 2;
+}
+message HistoryDeleteDirectiveSpecifics {
+  GlobalIdDirective  global_id_directive  = 1;
+  TimeRangeDirective time_range_directive = 2;
+  UrlDirective       url_directive        = 3;
+}
+message SyncHistoryDeleteDirective {
+  HistoryDeleteDirectiveSpecifics history_delete_directive = 150251;
+}
+
+message NigoriEncryptedData {
+  bytes  key_name    = 1;
+  bytes  cipher_text = 2;
+}
+message NigoriSpecifics {
+  NigoriEncryptedData encryption_keybag                  = 1;
+  bool   keybag_is_frozen                                = 2;
+  bool   encrypt_everything                              = 12;
+  int32  passphrase_type                                 = 13;
+  int64  keystore_migration_time                         = 14;
+  int64  custom_passphrase_time                          = 16;
+  int32  custom_passphrase_key_derivation_method         = 17;
+  bytes  custom_passphrase_key_derivation_salt           = 18;
+  bytes  cross_user_sharing_public_key                   = 24;
+}
+message SyncNigori {
+  NigoriSpecifics nigori = 47745;
+}
+
+message EdgeEDropSpecifics {
+  bytes  guid          = 1;
+  bytes  title         = 2;
+  bytes  content_type  = 3;
+  bytes  payload       = 4;
+  int64  creation_time = 5;
+}
+message SyncEdgeEDrop {
+  EdgeEDropSpecifics edge_e_drop = 956368;
+}
