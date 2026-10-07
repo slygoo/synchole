@@ -9,7 +9,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -442,40 +441,6 @@ func ParseTimeStamp(ts int64) string {
 	t := time.UnixMilli(ts).UTC().String()
 	return t
 
-}
-
-const TOKEN_TYPE_EDGE = 1
-const TOKEN_TYPE_AARMS = 2
-
-func GetToken(tokentype int) (string, error) {
-	appid := ""
-	resource := ""
-	if tokentype == TOKEN_TYPE_EDGE {
-		appid = "ecd6b820-32c2-49b6-98a6-444530e5a77a"
-		resource = "https://edgesync.microsoft.com/"
-	} else if tokentype == TOKEN_TYPE_AARMS {
-		appid = "ecd6b820-32c2-49b6-98a6-444530e5a77a"
-		resource = "https://aadrm.com/"
-	}
-	command := "go"
-	args := []string{"run", "main.go", "auth", "-i", "4", "-c", appid, "-r", resource}
-	cmd := exec.Command(command, args...)
-
-	cmd.Dir = "/root/sly/Dev/gotools/AzAuth"
-
-	output, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-
-	fmt.Println(string(output))
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
-		if strings.Contains(line, "eyJ") {
-			return line, nil
-		}
-	}
-	return "", errors.New("Could not get token " + string(output))
 }
 
 func RandomGUID() (string, error) {
