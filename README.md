@@ -1,6 +1,6 @@
 # synchole
 
-A small tool to interact with the Microsoft Edge Sync service which can read and write data via the sync service. Based on my talk at BSides Canberra IX "Let It Sync In". Slides and example videos are in the "presentation" folder. I will update shortly when the video of the presentation is released. 
+A small tool to interact with the Microsoft Edge Sync service which can read and write data via the sync service. Based on my talk at BSides Canberra IX "Let It Sync In". Slides and example videos are in the "presentation" folder. The full presentation can be found here: https://youtu.be/vJfBKMKA8Oo
 
 ## Building
 
